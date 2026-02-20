@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Plan Execution Visualizer</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#242836;--border:#2e3348;
+  --text:#e2e4ed;--text-dim:#8b8fa3;--text-bright:#ffffff;
+  --blue:#4e8cff;--blue-bg:rgba(78,140,255,.12);--blue-border:rgba(78,140,255,.3);
+  --green:#34d399;--green-bg:rgba(52,211,153,.12);--green-border:rgba(52,211,153,.3);
+  --purple:#a78bfa;--purple-bg:rgba(167,139,250,.12);--purple-border:rgba(167,139,250,.3);
+  --orange:#fb923c;--orange-bg:rgba(251,146,60,.12);--orange-border:rgba(251,146,60,.3);
+  --gray:#6b7280;--gray-bg:rgba(107,114,128,.1);--gray-border:rgba(107,114,128,.25);
+  --teal:#2dd4bf;--teal-bg:rgba(45,212,191,.12);--teal-border:rgba(45,212,191,.3);
+  --yellow:#fbbf24;--yellow-bg:rgba(251,191,36,.12);--yellow-border:rgba(251,191,36,.3);
+  --cyan:#22d3ee;--cyan-bg:rgba(34,211,238,.12);--cyan-border:rgba(34,211,238,.3);
+  --red:#f87171;
+  --radius:10px;--radius-sm:6px;
+  --connector:#2e3348;
+  --font-mono:'SF Mono','Cascadia Code','Fira Code',Consolas,monospace;
+}
+.light{
+  --bg:#f5f6fa;--surface:#ffffff;--surface2:#f0f1f5;--border:#d4d7e3;
+  --text:#1e2030;--text-dim:#6b7084;--text-bright:#000000;
+  --blue:#2563eb;--blue-bg:rgba(37,99,235,.08);--blue-border:rgba(37,99,235,.25);
+  --green:#059669;--green-bg:rgba(5,150,105,.08);--green-border:rgba(5,150,105,.25);
+  --purple:#7c3aed;--purple-bg:rgba(124,58,237,.08);--purple-border:rgba(124,58,237,.25);
+  --orange:#ea580c;--orange-bg:rgba(234,88,12,.08);--orange-border:rgba(234,88,12,.25);
+  --gray:#6b7280;--gray-bg:rgba(107,114,128,.06);--gray-border:rgba(107,114,128,.2);
+  --teal:#0d9488;--teal-bg:rgba(13,148,136,.08);--teal-border:rgba(13,148,136,.25);
+  --yellow:#d97706;--yellow-bg:rgba(217,119,6,.08);--yellow-border:rgba(217,119,6,.25);
+  --cyan:#0891b2;--cyan-bg:rgba(8,145,178,.08);--cyan-border:rgba(8,145,178,.25);
+  --red:#dc2626;
+  --connector:#c8cce0;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
+.app-header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 24px;
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:100}
+.app-header h1{font-size:18px;font-weight:700;color:var(--text-bright);white-space:nowrap}
+.header-meta{display:flex;gap:16px;flex-wrap:wrap;flex:1}
+.meta-chip{font-size:11px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:20px;padding:4px 12px;color:var(--text-dim);white-space:nowrap}
+.meta-chip strong{color:var(--text);font-weight:600}
+.header-actions{display:flex;gap:8px;align-items:center}
+.btn{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text);padding:6px 14px;font-size:12px;cursor:pointer;transition:.15s;font-weight:500}
+.btn:hover{border-color:var(--blue);color:var(--blue)}
+.btn.active{background:var(--blue-bg);border-color:var(--blue-border);color:var(--blue)}
+.toolbar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 24px;
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;transition:opacity .2s}
+.toolbar.disabled{opacity:.35;pointer-events:none}
+.toolbar label{font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:6px;cursor:pointer}
+.toolbar input[type=checkbox]{accent-color:var(--blue)}
+.stats-bar{display:flex;gap:16px;margin-left:auto;flex-wrap:wrap}
+.stat{font-size:11px;color:var(--text-dim)}
+.stat b{color:var(--text);font-weight:600}
+
+.main{padding:24px;max-width:1000px;margin:0 auto}
+
+/* ── Empty State ── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:calc(100vh - 140px);text-align:center;padding:40px 24px}
+.empty-icon{width:120px;height:120px;margin-bottom:32px;opacity:.7}
+.empty-icon svg{width:100%;height:100%}
+.empty-state h2{font-size:24px;font-weight:700;color:var(--text-bright);margin-bottom:12px}
+.empty-state p{font-size:14px;color:var(--text-dim);max-width:480px;margin-bottom:32px;line-height:1.7}
+.empty-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:40px}
+.btn-large{padding:12px 28px;font-size:14px;font-weight:600;border-radius:var(--radius);cursor:pointer;transition:.15s}
+.btn-large-primary{background:var(--blue);color:#fff;border:1px solid var(--blue);border-radius:var(--radius)}
+.btn-large-primary:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 4px 16px rgba(78,140,255,.3)}
+.btn-large-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius)}
+.btn-large-secondary:hover{border-color:var(--blue);color:var(--blue)}
+.drop-zone{width:100%;max-width:600px;border:2px dashed var(--border);border-radius:var(--radius);
+  padding:40px 24px;transition:border-color .2s,background .2s;cursor:pointer}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--blue);background:var(--blue-bg)}
+.drop-zone p{font-size:13px;color:var(--text-dim);margin:0}
+.drop-zone .drop-label{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+.drop-zone input[type=file]{display:none}
+
+.step-types-legend{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;
+  max-width:600px;margin-top:12px}
+.legend-item{font-size:10px;display:flex;align-items:center;gap:5px;color:var(--text-dim)}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* ── Flow ── */
+.swimlane-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;
+  padding:8px 16px;border-radius:var(--radius-sm);margin:20px 0 12px 0;display:inline-block}
+.swimlane-label.agent-topic_selector{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-border)}
+.swimlane-label.agent-verification{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.swimlane-label.agent-order_lookup{background:var(--cyan-bg);color:var(--cyan);border:1px solid var(--cyan-border)}
+.swimlane-label.agent-none{background:var(--gray-bg);color:var(--gray);border:1px solid var(--gray-border)}
+
+.step-list{position:relative;padding-left:28px}
+.step-list::before{content:'';position:absolute;left:9px;top:0;bottom:0;width:2px;
+  background:var(--connector);border-radius:1px}
+
+.step-card{position:relative;margin-bottom:8px;border-radius:var(--radius);
+  border:1px solid var(--border);background:var(--surface);overflow:hidden;
+  transition:border-color .15s,box-shadow .15s}
+.step-card:hover{border-color:color-mix(in srgb,var(--border) 50%,var(--text) 50%)}
+.step-card.expanded{box-shadow:0 4px 24px rgba(0,0,0,.2)}
+
+.step-dot{position:absolute;left:-24px;top:16px;width:12px;height:12px;border-radius:50%;
+  border:2px solid var(--border);background:var(--surface);z-index:2}
+
+.step-header{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;
+  user-select:none}
+.step-type-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+  padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.step-summary{font-size:13px;color:var(--text);flex:1;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.step-latency{font-size:11px;color:var(--text-dim);white-space:nowrap;font-family:var(--font-mono)}
+.step-chevron{color:var(--text-dim);transition:transform .2s;flex-shrink:0}
+.step-card.expanded .step-chevron{transform:rotate(90deg)}
+
+.step-body{padding:0 14px 14px;display:none}
+.step-card.expanded .step-body{display:block}
+
+.detail-section{margin-top:10px}
+.detail-section h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--text-dim);margin-bottom:6px}
+.detail-block{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:10px 12px;font-size:12px;font-family:var(--font-mono);line-height:1.6;
+  overflow-x:auto;white-space:pre-wrap;word-break:break-all;color:var(--text);max-height:400px;overflow-y:auto}
+
+.var-update{display:flex;gap:8px;align-items:baseline;padding:4px 0;
+  border-bottom:1px solid var(--border);font-size:12px}
+.var-update:last-child{border-bottom:none}
+.var-name{font-family:var(--font-mono);font-weight:600;color:var(--cyan);min-width:140px;flex-shrink:0}
+.var-arrow{color:var(--text-dim)}
+.var-old{color:var(--red);text-decoration:line-through;opacity:.6;font-family:var(--font-mono);font-size:11px}
+.var-new{color:var(--green);font-family:var(--font-mono);font-size:11px}
+.var-reason{color:var(--text-dim);font-size:11px;margin-top:2px}
+
+.tool-chip{display:inline-block;font-size:11px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:4px;padding:2px 8px;margin:2px 4px 2px 0;color:var(--text)}
+
+.msg-bubble{margin:6px 0;padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;
+  line-height:1.5;max-height:200px;overflow-y:auto}
+.msg-system{background:var(--purple-bg);border:1px solid var(--purple-border);color:var(--text)}
+.msg-user{background:var(--blue-bg);border:1px solid var(--blue-border);color:var(--text)}
+.msg-assistant{background:var(--green-bg);border:1px solid var(--green-border);color:var(--text)}
+.msg-tool{background:var(--teal-bg);border:1px solid var(--teal-border);color:var(--text)}
+.msg-role{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;opacity:.7}
+
+.fn-io{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:600px){.fn-io{grid-template-columns:1fr}}
+.fn-io-col h5{font-size:11px;font-weight:600;margin-bottom:4px}
+.fn-io-col .detail-block{font-size:11px}
+
+.step-card.type-UserInputStep .step-dot,
+.step-card.type-PlannerResponseStep .step-dot{border-color:var(--blue);background:var(--blue)}
+.step-card.type-UserInputStep .step-type-badge,
+.step-card.type-PlannerResponseStep .step-type-badge{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border)}
+
+.step-card.type-FunctionStep .step-dot{border-color:var(--green);background:var(--green)}
+.step-card.type-FunctionStep .step-type-badge{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+
+.step-card.type-LLMStep .step-dot{border-color:var(--purple);background:var(--purple)}
+.step-card.type-LLMStep .step-type-badge{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-border)}
+
+.step-card.type-TransitionStep .step-dot{border-color:var(--orange);background:var(--orange)}
+.step-card.type-TransitionStep .step-type-badge{background:var(--orange-bg);color:var(--orange);border:1px solid var(--orange-border)}
+
+.step-card.type-VariableUpdateStep .step-dot{border-color:var(--gray)}
+.step-card.type-VariableUpdateStep .step-type-badge{background:var(--gray-bg);color:var(--gray);border:1px solid var(--gray-border)}
+
+.step-card.type-BeforeReasoningIterationStep .step-dot,
+.step-card.type-AfterReasoningStep .step-dot{border-color:var(--gray)}
+.step-card.type-BeforeReasoningIterationStep .step-type-badge,
+.step-card.type-AfterReasoningStep .step-type-badge{background:var(--gray-bg);color:var(--gray);border:1px solid var(--gray-border)}
+
+.step-card.type-EnabledToolsStep .step-dot{border-color:var(--teal)}
+.step-card.type-EnabledToolsStep .step-type-badge{background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-border)}
+
+.step-card.type-ReasoningStep .step-dot{border-color:var(--yellow);background:var(--yellow)}
+.step-card.type-ReasoningStep .step-type-badge{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-border)}
+
+.step-card.type-NodeEntryStateStep .step-dot{border-color:var(--cyan)}
+.step-card.type-NodeEntryStateStep .step-type-badge{background:var(--cyan-bg);color:var(--cyan);border:1px solid var(--cyan-border)}
+
+.step-card.minor{opacity:.55;transition:opacity .15s}
+.step-card.minor:hover{opacity:1}
+
+.upload-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;
+  align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.upload-modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:24px;width:90%;max-width:700px;max-height:80vh;display:flex;flex-direction:column;gap:16px}
+.upload-modal h2{font-size:16px;color:var(--text-bright)}
+.upload-modal textarea{width:100%;height:300px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:12px;
+  padding:12px;resize:vertical}
+.upload-modal .btn-row{display:flex;gap:8px;justify-content:flex-end}
+.btn-primary{background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);
+  padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer}
+.btn-primary:hover{opacity:.9}
+.hidden{display:none}
+
+.safety-score{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;
+  border-radius:20px;font-size:12px;font-weight:600}
+.safety-safe{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.safety-unsafe{background:rgba(248,113,113,.12);color:var(--red);border:1px solid rgba(248,113,113,.3)}
+
+.error-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:rgba(248,113,113,.15);border:1px solid rgba(248,113,113,.4);color:var(--red);
+  padding:10px 20px;border-radius:var(--radius);font-size:13px;z-index:300;
+  animation:slideUp .3s ease;max-width:90%}
+@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(12px)}
+  to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.empty-state{animation:fadeIn .5s ease}
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <h1>Plan Execution Visualizer</h1>
+  <div class="header-meta" id="headerMeta"></div>
+  <div class="header-actions">
+    <button class="btn" id="btnTheme" title="Toggle theme">Light</button>
+    <button class="btn" id="btnLoad">Load JSON</button>
+    <button class="btn hidden" id="btnClear">Clear</button>
+  </div>
+</div>
+
+<div class="toolbar disabled" id="toolbar">
+  <label><input type="checkbox" id="chkVarUpdates"> Variable Updates</label>
+  <label><input type="checkbox" id="chkReasoning"> Reasoning Iterations</label>
+  <label><input type="checkbox" id="chkNodeEntry"> Node Entry State</label>
+  <label><input type="checkbox" id="chkEnabledTools"> Enabled Tools</label>
+  <div class="stats-bar" id="statsBar"></div>
+</div>
+
+<div class="main" id="main"></div>
+
+<div class="upload-overlay hidden" id="uploadOverlay">
+  <div class="upload-modal">
+    <h2>Load Plan JSON</h2>
+    <textarea id="jsonInput" placeholder="Paste your PlanSuccessResponse JSON here..."></textarea>
+    <div class="btn-row">
+      <button class="btn" id="btnCancel">Cancel</button>
+      <button class="btn-primary" id="btnParse">Visualize</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentData = null;
+let showMinor = { var: false, reasoning: false, nodeEntry: false, enabledTools: false };
+
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+function truncate(s, n) {
+  if (!s) return '';
+  return s.length > n ? s.slice(0, n) + '...' : s;
+}
+
+function agentKey(name) {
+  if (!name) return 'none';
+  return name.toLowerCase().replace(/\s+/g, '_');
+}
+
+function getAgentForStep(step, prevAgent) {
+  const d = step.data || {};
+  if (step.type === 'LLMStep' || step.type === 'EnabledToolsStep') return agentKey(d.agent_name);
+  if (step.type === 'NodeEntryStateStep' || step.type === 'BeforeReasoningIterationStep' || step.type === 'AfterReasoningStep') return agentKey(d.agent_name);
+  if (step.type === 'TransitionStep') return agentKey(d.from_agent);
+  if (step.type === 'FunctionStep') return prevAgent;
+  if (step.type === 'VariableUpdateStep') return prevAgent;
+  return prevAgent || 'none';
+}
+
+function isMinor(step) {
+  if (step.type === 'VariableUpdateStep') return !showMinor.var;
+  if (step.type === 'BeforeReasoningIterationStep' || step.type === 'AfterReasoningStep') return !showMinor.reasoning;
+  if (step.type === 'NodeEntryStateStep') return !showMinor.nodeEntry;
+  if (step.type === 'EnabledToolsStep') return !showMinor.enabledTools;
+  return false;
+}
+
+function stepSummary(step) {
+  switch (step.type) {
+    case 'UserInputStep':
+      return `User: &ldquo;${esc(truncate(step.message, 80))}&rdquo;`;
+    case 'PlannerResponseStep':
+      return `Response: &ldquo;${esc(truncate(step.message, 80))}&rdquo;`;
+    case 'NodeEntryStateStep':
+      return `Agent <b>${esc(step.data.agent_name)}</b> entered (${esc(step.data.directive_context)})`;
+    case 'VariableUpdateStep': {
+      const ups = step.data.variable_updates;
+      const names = ups.map(u => u.variable_name).join(', ');
+      return `${ups.length} var${ups.length > 1 ? 's' : ''}: ${esc(truncate(names, 60))}`;
+    }
+    case 'BeforeReasoningIterationStep':
+      return `${esc(step.data.agent_name)} pre-reasoning (${step.data.action_names.length} actions)`;
+    case 'AfterReasoningStep':
+      return `${esc(step.data.agent_name)} post-reasoning (${step.data.action_names.length} actions)`;
+    case 'EnabledToolsStep':
+      return `${esc(step.data.agent_name)}: ${step.data.enabled_tools.length} tools enabled`;
+    case 'LLMStep': {
+      const d = step.data || {};
+      const resp = step.response_messages || [];
+      const toolCall = resp.find(m => m.tool_invocation);
+      if (toolCall) return `${esc(d.agent_name)} LLM &rarr; tool: <b>${esc(toolCall.tool_invocation.name)}</b>`;
+      const textResp = resp.find(m => m.content);
+      if (textResp) return `${esc(d.agent_name)} LLM &rarr; &ldquo;${esc(truncate(textResp.content, 60))}&rdquo;`;
+      return `${esc(d.agent_name)} LLM call`;
+    }
+    case 'FunctionStep': {
+      const f = step.function || {};
+      const ok = f.output && (f.output.success !== false);
+      return `${ok ? '&#10003;' : '&#10007;'} <b>${esc(f.name)}</b>(${esc(truncate(JSON.stringify(f.input), 50))})`;
+    }
+    case 'TransitionStep':
+      return `<b>${esc(step.data.from_agent)}</b> &rarr; <b>${esc(step.data.to_agent)}</b> (${esc(step.data.transition_type)})`;
+    case 'ReasoningStep':
+      return `${esc(step.category)}: ${esc(truncate(step.reason, 70))}`;
+    default:
+      return esc(step.type);
+  }
+}
+
+function stepDetail(step) {
+  let html = '';
+  switch (step.type) {
+    case 'UserInputStep':
+      html += sec('Message', block(step.message));
+      break;
+    case 'PlannerResponseStep':
+      html += sec('Response', block(step.message));
+      html += sec('Type', `<span class="tool-chip">${esc(step.responseType)}</span>`);
+      if (step.safetyScore) {
+        const ss = step.safetyScore.safetyScore || {};
+        const safe = step.isContentSafe;
+        html += sec('Safety', `<span class="safety-score ${safe ? 'safety-safe' : 'safety-unsafe'}">${safe ? 'Safe' : 'Unsafe'} (${ss.safety_score})</span>`);
+        if (ss.category_scores) {
+          const cats = Object.entries(ss.category_scores).map(([k,v]) => `${k}: ${v}`).join(', ');
+          html += `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;font-family:var(--font-mono)">${esc(cats)}</div>`;
+        }
+      }
+      break;
+    case 'NodeEntryStateStep': {
+      const vars = step.data.state_variables || {};
+      const filtered = Object.entries(vars).filter(([k]) => !k.startsWith('__'));
+      html += sec('Agent', `<b>${esc(step.data.agent_name)}</b> &middot; ${esc(step.data.directive_context)}`);
+      html += sec('State Variables', `<div class="detail-block">${filtered.map(([k,v]) =>
+        `<span style="color:var(--cyan)">${esc(k)}</span>: ${esc(JSON.stringify(v))}`
+      ).join('\n')}</div>`);
+      break;
+    }
+    case 'VariableUpdateStep':
+      html += step.data.variable_updates.map(u => `
+        <div class="var-update">
+          <span class="var-name">${esc(u.variable_name)}</span>
+          <span>
+            <span class="var-old">${esc(truncate(String(u.variable_past_value), 120))}</span>
+            <span class="var-arrow"> &rarr; </span>
+            <span class="var-new">${esc(truncate(String(u.variable_new_value), 120))}</span>
+            <div class="var-reason">${esc(u.variable_change_reason)}</div>
+          </span>
+        </div>`).join('');
+      break;
+    case 'BeforeReasoningIterationStep':
+    case 'AfterReasoningStep':
+      html += sec('Agent', `<b>${esc(step.data.agent_name)}</b>`);
+      html += sec('Actions', step.data.action_names.map(a => `<span class="tool-chip">${esc(a)}</span>`).join(''));
+      break;
+    case 'EnabledToolsStep':
+      html += sec('Agent', `<b>${esc(step.data.agent_name)}</b> &middot; ${esc(step.data.directive_context)}`);
+      html += sec('Tools', step.data.enabled_tools.map(t => `<span class="tool-chip">${esc(t)}</span>`).join(''));
+      break;
+    case 'LLMStep': {
+      const d = step.data || {};
+      html += sec('Agent / Prompt', `<b>${esc(d.agent_name)}</b> &middot; ${esc(d.prompt_name)} &middot; <span style="color:var(--yellow)">${d.execution_latency}ms</span>`);
+      if (step.tools_sent) {
+        html += sec('Tools Sent', step.tools_sent.map(t => `<span class="tool-chip">${esc(t)}</span>`).join(''));
+      }
+      if (step.messages_sent) {
+        html += sec('Messages Sent', step.messages_sent.map(m => {
+          const cls = 'msg-' + (m.role || 'system');
+          return `<div class="msg-bubble ${cls}"><div class="msg-role">${esc(m.role)}</div>${esc(truncate(m.content || '(empty)', 300))}</div>`;
+        }).join(''));
+      }
+      if (step.response_messages) {
+        html += sec('Response', step.response_messages.map(m => {
+          let inner = '';
+          if (m.tool_invocation) {
+            inner = `<b>Tool Call:</b> ${esc(m.tool_invocation.name)}(${esc(m.tool_invocation.arguments)})`;
+          } else {
+            inner = esc(m.content || '(empty)');
+          }
+          return `<div class="msg-bubble msg-assistant"><div class="msg-role">${esc(m.role)}</div>${inner}</div>`;
+        }).join(''));
+      }
+      if (d.prompt_response) {
+        html += sec('LLM Text Response', block(d.prompt_response));
+      }
+      break;
+    }
+    case 'FunctionStep': {
+      const f = step.function || {};
+      html += sec('Function', `<b>${esc(f.name)}</b> &middot; <span style="color:var(--yellow)">${step.executionLatency}ms</span>`);
+      html += `<div class="fn-io">
+        <div class="fn-io-col"><h5>Input</h5><div class="detail-block">${esc(JSON.stringify(f.input, null, 2))}</div></div>
+        <div class="fn-io-col"><h5>Output</h5><div class="detail-block">${esc(JSON.stringify(f.output, null, 2))}</div></div>
+      </div>`;
+      break;
+    }
+    case 'TransitionStep': {
+      const d = step.data;
+      html += sec('Handoff', `<b>${esc(d.from_agent)}</b> &rarr; <b>${esc(d.to_agent)}</b>`);
+      html += `<div style="font-size:12px;margin-top:4px"><span class="tool-chip">${esc(d.transition_type)}</span><span class="tool-chip">${esc(d.transition_mode)}</span><span class="tool-chip">${esc(d.directive_context)}</span></div>`;
+      if (d.current_state) {
+        const filtered = Object.entries(d.current_state).filter(([k]) => !k.startsWith('__'));
+        html += sec('State at Transition', `<div class="detail-block">${filtered.map(([k,v]) =>
+          `<span style="color:var(--cyan)">${esc(k)}</span>: ${esc(JSON.stringify(v))}`
+        ).join('\n')}</div>`);
+      }
+      break;
+    }
+    case 'ReasoningStep':
+      html += sec('Category', `<span class="tool-chip">${esc(step.category)}</span>`);
+      html += sec('Reason', block(step.reason));
+      break;
+  }
+  return html;
+}
+
+function sec(title, content) {
+  return `<div class="detail-section"><h4>${esc(title)}</h4>${content}</div>`;
+}
+function block(text) {
+  return `<div class="detail-block">${esc(text)}</div>`;
+}
+
+function renderEmptyState() {
+  document.getElementById('headerMeta').innerHTML = '';
+  document.getElementById('statsBar').innerHTML = '';
+  document.getElementById('toolbar').classList.add('disabled');
+  document.getElementById('btnClear').classList.add('hidden');
+
+  document.getElementById('main').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">
+        <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="30" width="100" height="70" rx="8" stroke="var(--border)" stroke-width="2" fill="var(--surface)"/>
+          <rect x="10" y="30" width="100" height="18" rx="8" fill="var(--surface2)" stroke="var(--border)" stroke-width="2"/>
+          <circle cx="24" cy="39" r="3" fill="var(--red)"/>
+          <circle cx="34" cy="39" r="3" fill="var(--yellow)"/>
+          <circle cx="44" cy="39" r="3" fill="var(--green)"/>
+          <rect x="24" y="58" width="30" height="4" rx="2" fill="var(--purple)" opacity=".5"/>
+          <rect x="24" y="68" width="50" height="4" rx="2" fill="var(--blue)" opacity=".4"/>
+          <rect x="24" y="78" width="40" height="4" rx="2" fill="var(--green)" opacity=".4"/>
+          <rect x="24" y="88" width="55" height="4" rx="2" fill="var(--orange)" opacity=".3"/>
+          <path d="M75 65 L85 75 L95 60" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity=".6"/>
+        </svg>
+      </div>
+      <h2>Visualize Agent Plan Execution</h2>
+      <p>
+        Paste or drop a <strong>PlanSuccessResponse</strong> JSON to see the full execution flow
+        &mdash; agent transitions, LLM calls, function invocations, state changes, and more.
+      </p>
+      <div class="empty-actions">
+        <button class="btn-large btn-large-primary" id="emptyPaste">Paste JSON</button>
+        <label class="btn-large btn-large-secondary" id="emptyFileLabel">
+          Upload File
+          <input type="file" accept=".json,application/json" id="emptyFileInput">
+        </label>
+      </div>
+      <div class="drop-zone" id="dropZone">
+        <p class="drop-label">Drop a .json file here</p>
+        <p>or use the buttons above</p>
+      </div>
+      <div class="step-types-legend">
+        <div class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span>User / Response</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span>LLM Call</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Function</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--orange)"></span>Transition</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--cyan)"></span>Node Entry</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--teal)"></span>Tools</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--yellow)"></span>Reasoning</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--gray)"></span>Variables</div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('emptyPaste').addEventListener('click', openModal);
+
+  const fileInput = document.getElementById('emptyFileInput');
+  fileInput.addEventListener('change', e => {
+    if (e.target.files.length) readFile(e.target.files[0]);
+  });
+
+  const dropZone = document.getElementById('dropZone');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) readFile(e.dataTransfer.files[0]);
+  });
+  dropZone.addEventListener('click', () => fileInput.click());
+}
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      loadData(JSON.parse(e.target.result));
+    } catch (err) {
+      showError('Invalid JSON file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function showError(msg) {
+  const existing = document.querySelector('.error-toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'error-toast';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
+
+function loadData(json) {
+  if (!json || !json.plan || !Array.isArray(json.plan)) {
+    showError('JSON must contain a "plan" array. Expected a PlanSuccessResponse object.');
+    return;
+  }
+  currentData = json;
+  render();
+}
+
+function renderFlow() {
+  const plan = currentData.plan;
+  document.getElementById('toolbar').classList.remove('disabled');
+  document.getElementById('btnClear').classList.remove('hidden');
+
+  const meta = document.getElementById('headerMeta');
+  meta.innerHTML = [
+    currentData.planId ? `<span class="meta-chip"><strong>Plan</strong> ${esc(truncate(currentData.planId, 16))}</span>` : '',
+    currentData.sessionId ? `<span class="meta-chip"><strong>Session</strong> ${esc(truncate(currentData.sessionId, 16))}</span>` : '',
+    currentData.intent ? `<span class="meta-chip"><strong>Intent</strong> ${esc(currentData.intent)}</span>` : '',
+  ].join('');
+
+  let llmCount = 0, fnCount = 0, transitionCount = 0;
+  plan.forEach(s => {
+    if (s.type === 'LLMStep') llmCount++;
+    if (s.type === 'FunctionStep') fnCount++;
+    if (s.type === 'TransitionStep') transitionCount++;
+  });
+  const wallTime = plan.length ? plan[plan.length-1].endExecutionTime - plan[0].startExecutionTime : 0;
+
+  document.getElementById('statsBar').innerHTML = [
+    `<span class="stat"><b>${plan.length}</b> steps</span>`,
+    `<span class="stat"><b>${llmCount}</b> LLM calls</span>`,
+    `<span class="stat"><b>${fnCount}</b> functions</span>`,
+    `<span class="stat"><b>${transitionCount}</b> transitions</span>`,
+    `<span class="stat">Wall: <b>${wallTime}ms</b></span>`,
+  ].join('');
+
+  const main = document.getElementById('main');
+  let html = '';
+  let currentAgent = 'none';
+  let agentOpen = false;
+
+  plan.forEach((step, i) => {
+    const agent = getAgentForStep(step, currentAgent);
+    const minor = isMinor(step);
+
+    if (agent !== currentAgent || i === 0) {
+      if (agentOpen) html += '</div>';
+      html += `<div class="swimlane-label agent-${esc(agent)}">${esc(agent.replace(/_/g, ' '))}</div>`;
+      html += '<div class="step-list">';
+      agentOpen = true;
+      currentAgent = agent;
+    }
+
+    if (minor) return;
+
+    const latency = step.type === 'LLMStep' ? (step.data?.execution_latency || '') :
+                    step.type === 'FunctionStep' ? (step.executionLatency || '') : '';
+    const latencyStr = latency ? `${latency}ms` : '';
+    const duration = step.endExecutionTime - step.startExecutionTime;
+    const durationStr = duration > 0 ? `${duration}ms` : '';
+    const timeStr = [latencyStr, durationStr].filter(Boolean).join(' / ');
+
+    html += `<div class="step-card type-${esc(step.type)}" data-idx="${i}">
+      <div class="step-dot"></div>
+      <div class="step-header" onclick="toggle(this)">
+        <span class="step-type-badge">${esc(step.type.replace('Step',''))}</span>
+        <span class="step-summary">${stepSummary(step)}</span>
+        ${timeStr ? `<span class="step-latency">${timeStr}</span>` : ''}
+        <svg class="step-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="step-body">${stepDetail(step)}</div>
+    </div>`;
+  });
+
+  if (agentOpen) html += '</div>';
+  main.innerHTML = html;
+}
+
+function render() {
+  if (!currentData) {
+    renderEmptyState();
+  } else {
+    renderFlow();
+  }
+}
+
+function toggle(el) {
+  el.closest('.step-card').classList.toggle('expanded');
+}
+
+function openModal() {
+  document.getElementById('uploadOverlay').classList.remove('hidden');
+  document.getElementById('jsonInput').value = '';
+  setTimeout(() => document.getElementById('jsonInput').focus(), 100);
+}
+
+document.getElementById('chkVarUpdates').addEventListener('change', e => { showMinor.var = e.target.checked; render(); });
+document.getElementById('chkReasoning').addEventListener('change', e => { showMinor.reasoning = e.target.checked; render(); });
+document.getElementById('chkNodeEntry').addEventListener('change', e => { showMinor.nodeEntry = e.target.checked; render(); });
+document.getElementById('chkEnabledTools').addEventListener('change', e => { showMinor.enabledTools = e.target.checked; render(); });
+
+document.getElementById('btnTheme').addEventListener('click', () => {
+  document.body.classList.toggle('light');
+  document.getElementById('btnTheme').textContent = document.body.classList.contains('light') ? 'Dark' : 'Light';
+});
+
+document.getElementById('btnLoad').addEventListener('click', openModal);
+
+document.getElementById('btnClear').addEventListener('click', () => {
+  currentData = null;
+  render();
+});
+
+document.getElementById('btnCancel').addEventListener('click', () => {
+  document.getElementById('uploadOverlay').classList.add('hidden');
+});
+
+document.getElementById('btnParse').addEventListener('click', () => {
+  const val = document.getElementById('jsonInput').value.trim();
+  if (!val) { showError('Please paste some JSON first.'); return; }
+  try {
+    const json = JSON.parse(val);
+    document.getElementById('uploadOverlay').classList.add('hidden');
+    loadData(json);
+  } catch (e) {
+    showError('Invalid JSON: ' + e.message);
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('uploadOverlay').classList.add('hidden');
+});
+
+render();
+</script>
+</body>
+</html>
